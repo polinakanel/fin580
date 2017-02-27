@@ -1,0 +1,71 @@
+---
+title: "FIN580 - HW1"
+author: "Polina Kanel, Aurelie Cai"
+date: "February 26, 2017"
+output: pdf_document
+---
+
+This is the proxy for our future report (just to make sure that staff is working)
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align="center", fig.height=5.5, fig.width=6, collapse=T, comment=NA, 
+            prompt=F, echo = TRUE, cache=TRUE, autodep=TRUE)
+options(width=63)
+```
+
+
+Reading data into one large dataframe (will be hidden in the final vesion):
+
+```{r, eval = F}
+setwd("/Users/Paulina/Documents/Princeton/FIN 580 - Quant Data Analysis in Finance/HWs/HW1")
+
+get.data = function(name, filename, df){
+  fx_data = read.csv(filename)
+  df[name] = fx_data$Close
+  remove(fx_data)
+  return(df)
+  }
+
+aud = read.csv("AUDUSD.csv")
+fx.df = data.frame(date = aud$Date, aud = aud$Close)
+remove(aud)
+
+fx.df = get.data('cad', "CADUSD.csv",  fx.df)
+fx.df = get.data('chf', "CHFUSD.csv",  fx.df)
+fx.df = get.data('eur', "EURUSD.csv",  fx.df)
+fx.df = get.data('gbp', "GBPUSD.csv",  fx.df)
+fx.df = get.data('jpy', "JPYUSD.csv",  fx.df)
+fx.df = get.data('nok', "NOKUSD.csv",  fx.df)
+fx.df = get.data('nzd', "NZDUSD.csv",  fx.df)
+fx.df = get.data('sek', "SEKUSD.csv",  fx.df)
+
+```
+
+
+#Data Preprocessing:
+
+1. Calculating the returns on the 5-minute data and store it in the dataframe
+
+```{r, eval = F}
+calculate.returns = function(x){ diff(x)/x[1:length(x)-1] }
+calculate.volatility = function(x){ var(x) }
+
+fx.returns.df = apply(fx.df[,2:10],2,calculate.returns)
+fx.returns.df = as.data.frame(fx.returns.df)
+fx.returns.df$date = fx.df$date[2:dim(fx.df)[1]]
+```
+
+2. Create the date, month, year and weekid for the further aggregation of the data
+
+```{r, eval = F}
+fx.returns.df$date = as.Date(fx.returns.df$date, "%m/%d/%Y")
+fx.returns.df$month = months(fx.returns.df$date)
+fx.returns.df$year = format(fx.returns.df$date, format="%Y")
+
+fx.returns.daily = aggregate(fx.returns.df[,1:9],by=list(fx.returns.df$date), function(x){ sqrt(var(x)*60*12/5) })
+fx.returns.monthly = aggregate(fx.returns.df[,1:9],by=list(fx.returns.df$month, fx.returns.df$year), function(x){ sqrt(var(x)*60*12/5) })
+fx.returns.daily$week.id = rep(1:7, times = dim(fx.returns.daily)[1]/7)
+
+```
+
