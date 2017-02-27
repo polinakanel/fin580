@@ -17,7 +17,7 @@ options(width=63)
 
 Reading data into one large dataframe (will be hidden in the final vesion):
 
-```{r, eval = F}
+```{r}
 setwd("/Users/Paulina/Documents/Princeton/FIN 580 - Quant Data Analysis in Finance/HWs/HW1")
 
 get.data = function(name, filename, df){
@@ -39,7 +39,7 @@ fx.df = get.data('jpy', "JPYUSD.csv",  fx.df)
 fx.df = get.data('nok', "NOKUSD.csv",  fx.df)
 fx.df = get.data('nzd', "NZDUSD.csv",  fx.df)
 fx.df = get.data('sek', "SEKUSD.csv",  fx.df)
-
+save(fx.df, file="fxdf.RData")
 ```
 
 
@@ -47,34 +47,70 @@ fx.df = get.data('sek', "SEKUSD.csv",  fx.df)
 
 1. Calculating the returns on the 5-minute data and store it in the dataframe
 
-```{r, eval = F}
+```{r}
+load("fxdf.RData")
 calculate.returns = function(x){ diff(x)/x[1:length(x)-1] }
 calculate.volatility = function(x){ var(x) }
 
 fx.returns.df = apply(fx.df[,2:10],2,calculate.returns)
 fx.returns.df = as.data.frame(fx.returns.df)
 fx.returns.df$date = fx.df$date[2:dim(fx.df)[1]]
+
 ```
 
 2. Create the date, month, year and weekid for the further aggregation of the data
 
-```{r, eval = F}
+```{r}
 fx.returns.df$date = as.Date(fx.returns.df$date, "%m/%d/%Y")
 require(zoo)
 fx.returns.df$month.year = as.yearmon(fx.returns.df$date , format = "%b/%Y")
 
 # Form daily dataframe
-fx.returns.daily = aggregate(fx.returns.df[,1:9],by=list(fx.returns.df$date), function(x){ sqrt(var(x)*288) })
+fx.volatility.daily = aggregate(fx.returns.df[,1:9],by=list(fx.returns.df$date), function(x){ sqrt(var(x)*288) })
 
 # Form weekly dataframe
-n.weeks = dim(fx.returns.daily)[1]/7
-fx.returns.daily$week.id = rep(1:n.weeks, each = 7)
-fx.returns.weekly = aggregate(fx.returns.daily[,2:10],by = list(fx.returns.daily$week.id), function(x){ sqrt(var(x)*52) })
+n.weeks = dim(fx.volatility.daily)[1]/7
+fx.volatility.daily$week.id = rep(1:n.weeks, each = 7)
+fx.volatility.weekly = aggregate(fx.volatility.daily[,2:10],by = list(fx.volatility.daily$week.id), function(x){ sqrt(var(x)*52) })
 
 # Form monthly dataframe
-fx.returns.monthly = aggregate(fx.returns.df[,1:9],by=list(fx.returns.df$month.year), function(x){ sqrt(var(x)*12) })
+fx.volatility.monthly = aggregate(fx.returns.df[,1:9],by=list(fx.returns.df$month.year), function(x){ sqrt(var(x)*12) })
 
 remove(fx.df)
+
+```
+
+Getting a sense of the data that we got. For the daily data:
+
+```{r}
+currencies.names = names(fx.volatility.daily)[2:10]
+library(ggplot2)
+# plotting the histograms by currencies
+g = ggplot(stack(fx.volatility.daily[,2:10]), aes(x = values, y = ..density..), fill = ind)
+g + geom_histogram() + facet_grid(.~ind)
+
+# plotting the box plots by currencies
+g = ggplot(stack(fx.volatility.daily[,2:10]), aes(x = ind, y = values))
+g + geom_boxplot()
+```
+
+For the weekly data:
+
+```{r}
+g = ggplot(stack(fx.volatility.weekly[,2:10]), aes(x = ind, y = values))
+g + geom_boxplot()
+```
+
+
+For the monthly data:
+```{r}
+g = ggplot(stack(fx.volatility.monthly[,2:10]), aes(x = ind, y = values))
+g + geom_boxplot()
+
+```
+
+```{r}
+require(fGarch)
 
 ```
 
